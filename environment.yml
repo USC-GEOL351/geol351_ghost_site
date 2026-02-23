@@ -1,0 +1,36 @@
+name: geol351
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+
+  # Core scientific stack
+  - numpy
+  - scipy
+  - pandas
+  - matplotlib
+  - seaborn
+  - numba>=0.43.1  # older version will hang forever under python 3, https://github.com/climlab/climlab/issues/101
+  - cartopy
+
+  # Climate / geoscience
+  - climlab
+  - xarray
+  - netcdf4
+  - cftime
+  - h5netcdf
+  - h5py
+  - h5pyd
+  - fsspec
+  - metpy
+  - nc-time-axis  
+
+  # Time series / signal analysis
+  - nitime
+
+  # Media / animation support
+  - ffmpeg
+
+  # ESBMTK (not reliably on conda-forge)
+  - pip
+
