@@ -16,6 +16,20 @@ from IPython.display import display
 toggle = False # if false, solve ODE; if true, find equilibria
 labels = [0, 1]
 
+
+def _infer_param_labels(system, n_pars=3):
+    """Infer user-facing parameter names from known system names."""
+    nm = getattr(system, "__name__", "").lower()
+    if "lorenz" in nm:
+        base = ("sigma", "rho", "beta")
+    elif "roessler" in nm or "rossler" in nm:
+        base = ("a", "b", "c")
+    else:
+        base = tuple(f"p{i+1}" for i in range(int(n_pars)))
+    if len(base) < int(n_pars):
+        base = tuple(list(base) + [f"p{i+1}" for i in range(len(base), int(n_pars))])
+    return tuple(base[:int(n_pars)])
+
 def generate_phase_portrait(f, pars, Nframes=200, yrange=[-3.5, 3.5]):
     xrange = [-4, 4]
     Neval = 10
@@ -395,11 +409,18 @@ def launch_portrait_explorer(
     orientation='h',
     force_mode=None,
     fixed_members=None, 
+    param_labels=None,
     alpha=.5
 ):
     pars = tuple(pars)
     u0 = np.array(u0, dtype=float)
     plots = list(plots)
+    if param_labels is None:
+        param_labels = _infer_param_labels(system, n_pars=len(pars))
+    else:
+        param_labels = tuple(param_labels)
+    if len(param_labels) != len(pars):
+        raise ValueError("param_labels length must match len(pars).")
 
     state = {
         'run_id': 0,
@@ -440,7 +461,12 @@ def launch_portrait_explorer(
     ic_same_wdgt = widgets.Checkbox(value=True, description='Same IC (jitter=0)')
     jitter_wdgt = widgets.FloatSlider(description='Jitter +/-:', value=0.0, min=0.0, max=10.0, step=0.1, readout_format='.1f')
     ic_members_wdgt = widgets.IntSlider(description='IC members:', value=int(n_ic), min=1, max=20, step=1)
-    param_name_wdgt = widgets.Dropdown(options=[('a', 0), ('b', 1), ('c', 2)], value=2, description='Param:')
+    default_param_idx = min(2, max(0, len(pars) - 1))
+    param_name_wdgt = widgets.Dropdown(
+        options=[(param_labels[i], i) for i in range(len(pars))],
+        value=default_param_idx,
+        description='Param:'
+    )
     param_span_wdgt = widgets.FloatSlider(description='Param +/-:', value=0.1, min=0.0, max=2.0, step=0.01, readout_format='.2f')
     param_use_bounds_wdgt = widgets.Checkbox(value=False, description='Use min/max range')
     param_min_wdgt = widgets.FloatText(description='Param min:', value=float(pars[param_name_wdgt.value]) - float(param_span_wdgt.value))
@@ -638,8 +664,14 @@ def launch_portrait_explorer(
                 x_val, y_val, z_val, t_val = soln.y[0], soln.y[1], soln.y[2], soln.t
                 trajs.append({
                     'x_val': x_val, 'y_val': y_val, 'z_val': z_val, 't_val': t_val, 'color': cmap(param_colors[p_idx]),
-                    'label': (f"p={float(param_values[p_idx]):.3f}" if use_param and n_ic_local == 1
-                              else (f"IC {ic_idx+1}, p={float(param_values[p_idx]):.3f}" if use_param else f"IC {ic_idx+1}"))
+                    'label': (
+                        f"{param_labels[param_name_wdgt.value]}={float(param_values[p_idx]):.3f}"
+                        if use_param and n_ic_local == 1
+                        else (
+                            f"IC {ic_idx+1}, {param_labels[param_name_wdgt.value]}={float(param_values[p_idx]):.3f}"
+                            if use_param else f"IC {ic_idx+1}"
+                        )
+                    )
                 })
         return trajs, n_ic_local, n_param_local
 
@@ -787,7 +819,8 @@ def launch_portrait_explorer(
             item['ltz'].set_data(tr['t_val'][start_idx:j+1], tr['z_val'][start_idx:j+1]); item['ptz'].set_data(tr['t_val'][j:j+1], tr['z_val'][j:j+1])
         if state['ax'] is not None:
             state['ax'].view_init(30, state['azim'])
-            state['ax'].set_title(f"Rössler-like system for [{', '.join(['%.2f']*len(pars))}] | run #{state['run_id']}" % pars)
+            sys_name = getattr(system, "__name__", "system")
+            state['ax'].set_title(f"{sys_name} system | run #{state['run_id']}")
         if len(state['artists']) > 0:
             t_left = state['artists'][0]['tr']['t_val'][li_global]
             t_right = max(state['artists'][0]['tr']['t_val'][ri_global], t_left + 1e-6)
@@ -883,11 +916,18 @@ def launch_portrait_comparison_grid(
     u0=(10, 10, 10),
     n_members=4,
     T=200, 
+    param_labels=None,
     alpha=.5
 ):
     pars = tuple(pars)
     u0 = np.array(u0, dtype=float)
     n_members = max(1, min(int(n_members), 4))
+    if param_labels is None:
+        param_labels = _infer_param_labels(system, n_pars=len(pars))
+    else:
+        param_labels = tuple(param_labels)
+    if len(param_labels) != len(pars):
+        raise ValueError("param_labels length must match len(pars).")
 
     state = {
         'run_id': 0,
@@ -913,7 +953,12 @@ def launch_portrait_comparison_grid(
 
     ic_same_wdgt = widgets.Checkbox(value=True, description='Same IC (jitter=0)')
     jitter_wdgt = widgets.FloatSlider(description='Jitter +/-:', value=0.0, min=0.0, max=10.0, step=0.1, readout_format='.1f')
-    param_name_wdgt = widgets.Dropdown(options=[('a', 0), ('b', 1), ('c', 2)], value=2, description='Param:')
+    default_param_idx = min(2, max(0, len(pars) - 1))
+    param_name_wdgt = widgets.Dropdown(
+        options=[(param_labels[i], i) for i in range(len(pars))],
+        value=default_param_idx,
+        description='Param:'
+    )
     param_span_wdgt = widgets.FloatSlider(description='Param +/-:', value=0.1, min=0.0, max=2.0, step=0.01, readout_format='.2f')
     param_use_bounds_wdgt = widgets.Checkbox(value=False, description='Use min/max range')
     param_min_wdgt = widgets.FloatText(description='Param min:', value=float(pars[param_name_wdgt.value]) - float(param_span_wdgt.value))
@@ -991,7 +1036,7 @@ def launch_portrait_comparison_grid(
                 trajs.append({
                     'x_val': soln.y[0], 'y_val': soln.y[1], 'z_val': soln.y[2], 't_val': soln.t,
                     'color': cmap(shade[i]),
-                    'label': f"p={float(pval):.3f}"
+                    'label': f"{param_labels[param_name_wdgt.value]}={float(pval):.3f}"
                 })
         else:
             jitter_amp = 0.0 if ic_same_wdgt.value else float(jitter_wdgt.value)
