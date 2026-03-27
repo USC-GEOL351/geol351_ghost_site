@@ -2,7 +2,7 @@ name: geol351
 channels:
   - conda-forge
 dependencies:
-  - python=3.11
+  - python=3.13
 
   # Core scientific stack
   - numpy
